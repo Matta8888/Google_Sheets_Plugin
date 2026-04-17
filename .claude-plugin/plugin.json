@@ -1,0 +1,18 @@
+{
+  "name": "sheets-modelling",
+  "description": "Google Sheets modelling best practices skill. Encodes the FAST Standard, tidy data, classic blue/black/green/red colour convention, formula hygiene, Google Sheets performance limits, and an audit-first workflow. Pairs with the Google Sheets MCP — mandates enable_claude_log before every write.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Matt Shields",
+    "email": "matt.shields@carwow.co.uk"
+  },
+  "keywords": [
+    "google-sheets",
+    "modelling",
+    "fast-standard",
+    "tidy-data",
+    "financial-modelling",
+    "spreadsheet-audit",
+    "carwow"
+  ]
+}

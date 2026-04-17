@@ -1,0 +1,20 @@
+{
+  "name": "sheets-modelling-local",
+  "description": "Local marketplace for the sheets-modelling plugin. Install by adding this directory as a marketplace in Claude Code.",
+  "owner": {
+    "name": "Matt Shields",
+    "email": "matt.shields@carwow.co.uk"
+  },
+  "plugins": [
+    {
+      "name": "sheets-modelling",
+      "description": "Google Sheets modelling best practices — FAST, tidy data, classic colour convention, audit-first workflow. Pairs with the Google Sheets MCP.",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "Matt Shields",
+        "email": "matt.shields@carwow.co.uk"
+      }
+    }
+  ]
+}
