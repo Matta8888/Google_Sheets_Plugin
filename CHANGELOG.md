@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.0 — 2026-04-17
+
+Adds structural patterns for M&A delivery workbooks to `financial-modelling-extras`, drawn from real-world model review.
+
+### Added — `financial-modelling-extras`
+
+- **Tab structure and ordering** — `move_sheet` must be called sequentially (not parallel); canonical tab order for M&A delivery (About → Inputs → entity standalones → Synergies → Pro Forma → Valuation → Checks → Claude_Log); utility tabs hidden via `set_sheet_visibility hidden: true`.
+- **Entity standalone P&L four-section structure** — Section A (Revenue Drivers, blue font), B (Cost Drivers, blue font), C (Revenue Build, black formulas), D (P&L Summary, black formulas); totals rows get green `#D9EAD3` + bold; Sections C/D must never contain hardcoded constants.
+- **Assumptions Log tab** — mandatory deliverable built after entity tabs; columns: #, Assumption (280), Value/Range (200), Source & Rationale (400, WRAP); analyst assumptions prefixed `★`; Checks row asserting `COUNTIF(★) > 0`.
+- **Pro Forma MEMO section** — below the EBITDA bridge: Incremental Revenue, Incremental EBITDA, Implied Revenue CAGR vs buyer standalone; memo only, does not feed EV.
+- **Static Comparables table** — on Valuation tab below football field; columns: Company/Transaction, EV/Rev, EV/EBITDA, Context, Relevance; labelled "Reference only — not formula-linked"; `set_cell_note` explains static rationale.
+- **Two new Required Checks rows** — all implied EV values > £10M (catches unit errors); blended valuation Low < Mid < High (catches copy-paste errors).
+
 ## 2.0.0 — 2026-04-18
 
 Closes the gap between "technically correct spreadsheet" and "defensible document an executive would open without wincing."

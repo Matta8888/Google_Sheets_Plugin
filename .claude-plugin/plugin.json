@@ -1,7 +1,7 @@
 {
   "name": "sheets-modelling",
   "description": "Google Sheets modelling best practices. Two skills: google-sheets-modelling (FAST, tidy data, colour convention, formula hygiene, 3-pass build with formatting phase and post-write sanity gate) and financial-modelling-extras (DCF, football field, M&A pro forma, synergy structure, paid-vs-captured split). Pairs with the Google Sheets MCP — mandates enable_claude_log before every write.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": {
     "name": "Matt Shields",
     "email": "matt.shields@carwow.co.uk"

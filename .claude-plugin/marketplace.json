@@ -9,7 +9,7 @@
     {
       "name": "sheets-modelling",
       "description": "Google Sheets modelling best practices — FAST, tidy data, classic colour convention, audit-first workflow, 3-pass build with formatting phase and post-write sanity gate. Plus financial-modelling-extras (DCF, football field, M&A pro forma, synergies).",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "source": "./",
       "author": {
         "name": "Matt Shields",

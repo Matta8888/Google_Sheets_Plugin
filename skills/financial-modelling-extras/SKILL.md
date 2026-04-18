@@ -1,6 +1,6 @@
 ---
 name: financial-modelling-extras
-description: Use when building or auditing DCFs, valuation models, M&A pro formas, synergy cases, football-field valuations, or any model that produces an EV / equity value / multiple. Covers DCF structure, terminal-value conventions, football-field layout, pro-forma bridge checks, revenue-vs-cost synergy split with flow-through %, paid-vs-captured synergy memo, and sign-convention assertions. Pairs with google-sheets-modelling — inherits its FAST / colour / audit-first / verification-gate rules.
+description: Use when building or auditing DCFs, valuation models, M&A pro formas, synergy cases, football-field valuations, or any model that produces an EV / equity value / multiple. Covers DCF structure, terminal-value conventions, football-field layout, pro-forma bridge checks, revenue-vs-cost synergy split with flow-through %, paid-vs-captured synergy memo, and sign-convention assertions. Pairs with google-sheets-modelling — inherits its FAST / colour / audit-first / verification-gate rules. Also covers tab ordering for Google Sheets delivery, entity P&L section structure, Assumptions Log, Pro Forma MEMO section, and Comparables table.
 ---
 
 # Financial modelling extras
@@ -115,6 +115,98 @@ Represent this as a `Checks` row: `=ABS(pro_forma_ebitda - sum_of_parts) < err_t
 
 If this fails, the model's unusable — STOP before presenting.
 
+## Tab structure and ordering (Google Sheets delivery)
+
+`move_sheet` must be called **sequentially** (one call per tab, not batched) because each move shifts sheet indices for subsequent tabs. Parallel calls will produce the wrong final order.
+
+Canonical tab order for an M&A delivery workbook:
+
+| Position | Tab | Notes |
+|---|---|---|
+| 0 | About | First tab a reviewer opens — must be clean |
+| 1 | Inputs | All blue-font hardcoded assumptions |
+| 2+ | [Buyer standalone] | One tab per entity |
+| 3+ | [Target standalone] | One tab per entity |
+| N-4 | Synergies | Revenue + cost ramp |
+| N-3 | Pro Forma | Bridge + MEMO |
+| N-2 | Valuation | Football field + Comparables |
+| N-1 | Checks | All assertion rows |
+| N | Claude_Log | Hidden from reviewer |
+
+**Utility tabs** (scratch, raw data imports, intermediate calcs not shown to reviewer) must be hidden via `set_sheet_visibility` with `hidden: true` before delivery. Do not delete — the data may be needed later.
+
+`About` is always position 0. The reviewer opens it first and it sets the tone. If `About` is buried, the model looks unfinished.
+
+## Entity standalone P&L — four-section structure
+
+Each entity tab (Buyer, Target) follows four named sections, separated by a blank row:
+
+| Section | Label | Font | Content |
+|---|---|---|---|
+| A | Revenue Drivers | Blue `#0000FF` | Hardcoded inputs: prices, volumes, growth rates. One row per driver. Row labels describe the logic inline (e.g. "UK GMV growth rate — management case"). |
+| B | Cost Drivers | Blue `#0000FF` | Hardcoded inputs: margin %, overhead £. Same inline-label convention. |
+| C | Revenue Build | Black | Formulas only — references Section A and `Inputs`. No hardcoded numbers. |
+| D | P&L Summary | Black | Formulas through to EBITDA — references Sections A, B, C and `Inputs`. |
+
+**Totals rows** in C and D get green background `#D9EAD3` + bold font. This is the only green fill in the workbook — it marks "the answer row" for that section.
+
+**Rule:** Sections C and D must never contain hardcoded constants. If a number appears in a formula in C or D, it must trace back to Section A, Section B, or `Inputs`. Magic-number lint catches this — fix before declaring done.
+
+## Assumptions Log tab (mandatory deliverable)
+
+Built **after** all entity tabs are complete. One tab, named `Assumptions Log`. Purpose: give a reviewer a single place to interrogate every assumption without opening formulas.
+
+**Column structure:**
+
+| Col | Header | Width | Notes |
+|---|---|---|---|
+| A | # | 20 | Auto-number (ARRAYFORMULA or manual) |
+| B | Assumption | 280 | Short label — matches the row label in source tab |
+| C | Value / Range | 200 | The actual number or range used |
+| D | Source & Rationale | 400 | Free text, WRAP on. Where the number came from + why. |
+
+**Layout rules:**
+- Group rows under bold section headers that match the source tab (e.g. **Buyer**, **Target**, **Synergies**, **Valuation**)
+- Analyst assumptions (not sourced from management or data) are prefixed with `★` in column B
+- Do not formula-link column C back to the model — this is a read-only narrative log, not a live feed. Update it when assumptions change.
+
+**Checks row:**
+
+```
+Analyst assumptions flagged | >0 | =COUNTIF(B:B,"★*")>0
+```
+
+If COUNTIF returns 0, no assumptions have been flagged as analyst-owned — that's almost certainly wrong. STOP and review.
+
+## Pro Forma MEMO section and Valuation Comparables table
+
+### Pro Forma MEMO
+
+Immediately below the EBITDA bridge on the `Pro Forma` tab, add a MEMO section:
+
+```
+MEMO: INCREMENTAL VALUE VS [BUYER] STANDALONE
+Incremental Revenue       | £Xm  | =pro_forma_revenue - buyer_standalone_revenue
+Incremental EBITDA        | £Xm  | =pro_forma_ebitda - buyer_standalone_ebitda
+Implied Revenue CAGR (combined vs buyer standalone) | X% | formula
+```
+
+Header row: bold, no fill. Values: black font formula. This is a **memo** — it does not feed the football field or the EV calculation. It answers "what does the buyer gain vs doing nothing?"
+
+### Static Comparables table
+
+On the `Valuation` tab, below the football field, add a static reference table:
+
+| Column | Width | Content |
+|---|---|---|
+| Company / Transaction | 220 | Name |
+| EV / Revenue | 100 | Multiple (e.g. `3.2x`) |
+| EV / EBITDA | 100 | Multiple |
+| Context | 260 | Date, geography, deal type |
+| Relevance | 200 | Why included — one sentence |
+
+Label the block: `"Reference only — not formula-linked."` Use `set_cell_note` on the header to explain why it's static (avoids future confusion about why these don't update).
+
 ## Synergy structure (MANDATORY format)
 
 ### Revenue vs cost split
@@ -198,6 +290,8 @@ In addition to the main skill's `Checks`:
 | Cost sign convention | costs negative |
 | Integration cost sign | negative |
 | No double-count of synergy in EV | standalone_ev == dcf_ev (synergy memo separate) |
+| All implied EV values > £10M (catches unit errors e.g. margin % used instead of £ value in multiple calc) | TRUE for all methods |
+| Blended valuation Low < Mid < High (catches copy-paste formula errors in blend) | TRUE |
 
 ## Red flags — STOP
 
