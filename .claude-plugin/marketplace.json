@@ -1,6 +1,6 @@
 {
-  "name": "sheets-modelling-local",
-  "description": "Local marketplace for the sheets-modelling plugin. Install by adding this directory as a marketplace in Claude Code.",
+  "name": "sheets-modelling",
+  "description": "Google Sheets modelling plugin for Claude — FAST Standard, tidy data, colour convention, 3-pass build, and financial-modelling-extras (DCF, football field, M&A pro forma, synergies).",
   "owner": {
     "name": "Matt Shields",
     "email": "matt.shields@carwow.co.uk"
