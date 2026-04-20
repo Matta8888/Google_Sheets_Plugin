@@ -25,6 +25,14 @@ Violating the letter of the rules is violating the spirit. An unformatted model 
 - Converting messy wide-format data to tidy long-format
 - User asks for colour conventions, formatting, named ranges, data validation, or error checks
 
+## MCP connection check (MANDATORY — do this first)
+
+Before any other action, call `ping_sheets`. If it fails or returns an error, **stop immediately** and tell the user:
+
+> "The Google Sheets MCP is not connected. Please check your MCP server is running and try again."
+
+Do not proceed with any spreadsheet work until `ping_sheets` succeeds.
+
 ## Audit-first workflow (MANDATORY for any existing sheet)
 
 When the user points you at an existing spreadsheet, **do not write anything** before completing steps 1–4:

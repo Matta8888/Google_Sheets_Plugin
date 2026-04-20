@@ -5,6 +5,14 @@ description: Use when building or auditing DCFs, valuation models, M&A pro forma
 
 # Financial modelling extras
 
+## MCP connection check (MANDATORY — do this first)
+
+Before any other action, call `ping_sheets`. If it fails or returns an error, **stop immediately** and tell the user:
+
+> "The Google Sheets MCP is not connected. Please check your MCP server is running and try again."
+
+Do not proceed with any spreadsheet work until `ping_sheets` succeeds.
+
 ## Core principle
 
 Inherits every rule from `google-sheets-modelling`. Adds structure specific to **valuation** and **M&A** models, where the cost of a small methodology error is large (£100m+ EV swings are routine).
