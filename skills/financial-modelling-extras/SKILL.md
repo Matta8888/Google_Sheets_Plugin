@@ -137,18 +137,20 @@ Canonical tab order for an M&A delivery workbook:
 
 `About` is always position 0. The reviewer opens it first and it sets the tone. If `About` is buried, the model looks unfinished.
 
+**Tab colours (applied via `set_tab_color`):** About → grey `#D9D9D9`, Inputs + Assumptions Log → yellow `#FFF2CC`, Buyer/Target standalone + Synergies + Calcs → mid blue `#6FA8DC`, Pro Forma + Valuation + Outputs → green `#93C47D`, Checks → orange `#F6B26B`, Claude_Log → dark grey `#666666`. See the "Tab colour palette" section in `google-sheets-modelling` for the full mapping.
+
 ## Entity standalone P&L — four-section structure
 
 Each entity tab (Buyer, Target) follows four named sections, separated by a blank row:
 
-| Section | Label | Font | Content |
-|---|---|---|---|
-| A | Revenue Drivers | Blue `#0000FF` | Hardcoded inputs: prices, volumes, growth rates. One row per driver. Row labels describe the logic inline (e.g. "UK GMV growth rate — management case"). |
-| B | Cost Drivers | Blue `#0000FF` | Hardcoded inputs: margin %, overhead £. Same inline-label convention. |
-| C | Revenue Build | Black | Formulas only — references Section A and `Inputs`. No hardcoded numbers. |
-| D | P&L Summary | Black | Formulas through to EBITDA — references Sections A, B, C and `Inputs`. |
+| Section | Label | Font | Fill | Content |
+|---|---|---|---|---|
+| A | Revenue Drivers | Blue `#0000FF` | Yellow `#FFF2CC` | Hardcoded inputs: prices, volumes, growth rates. One row per driver. Row labels describe the logic inline (e.g. "UK GMV growth rate — management case"). |
+| B | Cost Drivers | Blue `#0000FF` | Yellow `#FFF2CC` | Hardcoded inputs: margin %, overhead £. Same inline-label convention. |
+| C | Revenue Build | Black | none | Formulas only — references Section A and `Inputs`. No hardcoded numbers. |
+| D | P&L Summary | Black | none | Formulas through to EBITDA — references Sections A, B, C and `Inputs`. |
 
-**Totals rows** in C and D get green background `#D9EAD3` + bold font. This is the only green fill in the workbook — it marks "the answer row" for that section.
+**Totals rows** in C and D get green background `#D9EAD3` + bold font — still the only green fill in the workbook, marking "the answer row" for each section. (Yellow on A and B marks inputs; green on C/D totals marks outputs — no overlap.)
 
 **Rule:** Sections C and D must never contain hardcoded constants. If a number appears in a formula in C or D, it must trace back to Section A, Section B, or `Inputs`. Magic-number lint catches this — fix before declaring done.
 
@@ -169,6 +171,8 @@ Built **after** all entity tabs are complete. One tab, named `Assumptions Log`. 
 - Group rows under bold section headers that match the source tab (e.g. **Buyer**, **Target**, **Synergies**, **Valuation**)
 - Analyst assumptions (not sourced from management or data) are prefixed with `★` in column B
 - Do not formula-link column C back to the model — this is a read-only narrative log, not a live feed. Update it when assumptions change.
+- **Every data row** (not headers, not section dividers) gets yellow fill `#FFF2CC` across columns B:D — matches the in-tab assumption colour convention.
+- Tab colour: yellow `#FFF2CC` via `set_tab_color` (same as the `Inputs` tab — both are assumption tabs).
 
 **Checks row:**
 
