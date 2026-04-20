@@ -1,6 +1,6 @@
 ---
 name: financial-modelling-extras
-description: Use when building or auditing DCFs, valuation models, M&A pro formas, synergy cases, football-field valuations, or any model that produces an EV / equity value / multiple. Covers DCF structure, terminal-value conventions, football-field layout, pro-forma bridge checks, revenue-vs-cost synergy split with flow-through %, paid-vs-captured synergy memo, and sign-convention assertions. Pairs with google-sheets-modelling — inherits its FAST / colour / audit-first / verification-gate rules. Also covers tab ordering for Google Sheets delivery, entity P&L section structure, Assumptions Log, Pro Forma MEMO section, and Comparables table.
+description: Use when building or auditing DCFs, valuation models, M&A pro formas, synergy cases, football-field valuations, or any model producing an EV / equity value / multiple / acquisition recommendation. Triggers on Gordon growth, terminal value, WACC, exit multiple, pro-forma bridge, revenue synergy, cost synergy, flow-through, integration cost, paid-vs-captured, comparables, trading comps, transaction comps, LBO, standalone vs combined, synergy PV. Pairs with google-sheets-modelling — inherits FAST / colour / audit-first / post-write-gate rules.
 ---
 
 # Financial modelling extras
@@ -12,6 +12,10 @@ Before any other action, call `ping_sheets`. If it fails or returns an error, **
 > "The Google Sheets MCP is not connected. Please check your MCP server is running and try again."
 
 Do not proceed with any spreadsheet work until `ping_sheets` succeeds.
+
+## Required background
+
+**REQUIRED BACKGROUND:** Read `google-sheets-modelling` first — every rule there applies unchanged here (FAST tab order, colour convention, audit-first workflow, Pass 2 formatting checklist, post-write sanity gate, Claude_Log workflow, tab colour palette). This skill adds **valuation / M&A-specific** structure on top.
 
 ## Core principle
 

@@ -1,9 +1,17 @@
 ---
 name: google-sheets-modelling
-description: Use when building, auditing, restructuring, or formatting any Google Sheet — financial models, trackers, dashboards, raw-data logs, or forecast models — especially via the Google Sheets MCP. Covers the FAST standard, tidy data, the classic blue/black/green/red colour convention, formula hygiene, Google Sheets performance, and a three-pass build workflow (content → format → verify) with mandatory pre-write and post-write gates so models ship looking defensible, not amateur.
+description: Use when building, auditing, or formatting any Google Sheet via the Sheets MCP — DCFs, P&L models, trackers, dashboards, forecast models. Also use when the user says "clean up", "fix", "audit", "restructure", "improve" a sheet, or when a sheet looks amateur, unformatted, or has numbers that don't tie. Triggers on tabs, named ranges, assumption cells, cell colours, tidy data, format inference bugs, volatile formulas, magic numbers, hardcoded inputs, or any `write_range` / `format_range` / `add_sheet` operation. Pairs with financial-modelling-extras for DCF / M&A specifics.
 ---
 
 # Google Sheets modelling
+
+## MCP connection check (MANDATORY — do this first)
+
+Before any other action, call `ping_sheets`. If it fails or returns an error, **stop immediately** and tell the user:
+
+> "The Google Sheets MCP is not connected. Please check your MCP server is running and try again."
+
+Do not proceed with any spreadsheet work until `ping_sheets` succeeds.
 
 ## Core principle
 
@@ -24,14 +32,6 @@ Violating the letter of the rules is violating the spirit. An unformatted model 
 - Adding tabs, ranges, formulas, or formats via the Sheets MCP
 - Converting messy wide-format data to tidy long-format
 - User asks for colour conventions, formatting, named ranges, data validation, or error checks
-
-## MCP connection check (MANDATORY — do this first)
-
-Before any other action, call `ping_sheets`. If it fails or returns an error, **stop immediately** and tell the user:
-
-> "The Google Sheets MCP is not connected. Please check your MCP server is running and try again."
-
-Do not proceed with any spreadsheet work until `ping_sheets` succeeds.
 
 ## Audit-first workflow (MANDATORY for any existing sheet)
 
@@ -74,14 +74,14 @@ Exactly one summary row per chat thread. Call it even if the work failed — rec
 
 Run this checklist as a literal to-do. Skip nothing:
 
-- [ ] Font colour per role (blue input / black formula / green cross-sheet / red external)
+- [ ] Font colour + fill per cell role — see "Colour convention" below (blue+yellow input / black formula / green cross-sheet / red external)
 - [ ] Number format applied per data class (see table below) — every currency cell, every %, every count
 - [ ] One unit per tab — raw £ OR £m, never both. Mixed-unit tabs fail audit.
 - [ ] Column widths set via `set_column_width` (pad 20 / label 260 / sub-label 180 / year 95 / note 160)
 - [ ] Frozen panes via `set_frozen` — any tab with >10 data rows freezes the header row and label column (standard P&L: `{rows: 3, cols: 3}`)
 - [ ] Title row bold 14pt
-- [ ] Main / section header rows: bold, **black fill `#000000` with white text `#FFFFFF`**, top + bottom border
-- [ ] Sub-header rows (within a section): bold, grey fill `#D9D9D9`, black text, bottom border only
+- [ ] Main / section header rows — see "Colour convention → Structural signals" (black fill, white text, bold, top + bottom border)
+- [ ] Sub-header rows (within a section) — see "Colour convention → Structural signals" (grey fill, black text, bold, bottom border)
 - [ ] Totals rows: bold, solid top border
 - [ ] Conditional format on any TRUE/FALSE column (green TRUE / red FALSE) via `set_conditional_format`
 - [ ] Borders for section separators — **never blank rows**
@@ -245,7 +245,7 @@ Without this, a 50-row P&L can quietly flip sign half-way down and nobody notice
 - `Inputs` tab — **no protection** (user edits here)
 - All formula tabs — **no hard protection** (Claude needs to write here)
 - `About` and `Checks` tabs — **`warningOnly: true` via `set_sheet_protection`** (users see a warning on edit but can proceed; stops accidental overwrites of the artefacts executives read first)
-- `Claude_Log` tab — **do not protect** (logging middleware appends)
+- `Claude_Log` tab — **do not protect** (`log_session_summary` appends here at end of thread)
 
 ## Integrity checks
 
@@ -315,6 +315,7 @@ Near these limits? Shard across spreadsheets and use **snapshot** `IMPORTRANGE`.
 
 | Task | MCP tool(s) |
 |---|---|
+| MCP connection check | `ping_sheets` (mandatory first call; see "MCP connection check" section) |
 | Audit structure | `get_spreadsheet_metadata`, `list_named_ranges`, `get_charts_and_pivots` |
 | Audit formulas | `read_range` with `value_render: "FORMULA"` |
 | Hunt anti-patterns | `search_in_spreadsheet` with `use_regex: true` |
@@ -332,34 +333,39 @@ Near these limits? Shard across spreadsheets and use **snapshot** `IMPORTRANGE`.
 | Sheet protection (warn-only) | `set_sheet_protection` |
 | Define constants | `set_named_range` |
 | Document exceptions | `set_cell_note` |
-| Enable audit trail | `enable_claude_log` (mandatory before any write) |
+| Enable the Claude_Log tab | `enable_claude_log` (mandatory once per spreadsheet before first write; idempotent) |
 | Tab colours | `set_tab_color` |
 | Write the session summary to Claude_Log | `log_session_summary` (call once at end of thread) |
 | Post-write sanity read | `read_range` with `value_render: "FORMATTED"` or `return_computed: true` on the write itself |
 
-## Red flags — STOP and re-plan
+## Red flags — Process (STOP and re-plan)
 
 | You're about to... | Fix |
 |---|---|
+| Skip the `ping_sheets` check at session start | Stop. Call it. If it fails, the MCP isn't connected — tell the user and wait. |
 | Write to an existing sheet without first doing an audit report | Run the 4-step audit, report, wait for approval |
 | Call any write tool without first calling `enable_claude_log` | Stop. Call `enable_claude_log`. Non-negotiable. |
 | End the chat thread without calling `log_session_summary` | Non-negotiable. One summary row per thread — otherwise the audit trail is silent. |
-| Declare done without running the post-write sanity gate | Stop. Re-read outputs, assert the four checks, then declare. |
+| Declare done without running the post-write sanity gate | Stop. Re-read outputs, assert the five checks, then declare. |
 | Skip the formatting phase and move to verify | Formatting is not polish. It's Pass 2. |
-| Use yellow fill WITHOUT blue font on an assumption | Yellow fill is additive — blue font still encodes role. Apply both. |
-| Use blue font WITHOUT yellow fill on an assumption | Yellow fill `#FFF2CC` is mandatory on every hardcoded input. Apply both. |
-| Main header row not black-fill white-text | Main headers use `#000000` fill + `#FFFFFF` text. Grey `#D9D9D9` is for sub-headers only. |
-| Borders that stop mid-row on a totals or section line | Borders must span every data column (B:last-year-col). Extend to full width. |
-| Ship a workbook without role-coded tab colours | Every tab gets a colour from the palette in "Tab colour palette". Call `set_tab_color`. |
-| Put a magic number in a formula | Extract to `Inputs` as a named range |
-| Merge cells inside a data zone | No. Borders + bold for visual grouping |
+| Proceed past a `ROW_COUNT_MISMATCH` error | Retry with the `suggested_range` from the error — don't guess |
 | Use `IMPORTRANGE` for live data | Snapshot pattern instead |
 | Wrap a VLOOKUP in bare `IFERROR(..., "")` | Surface: `IF(ISERROR(...), "MISSING", ...)` and add to `Checks` |
 | Use `=TODAY()` in more than one cell | One in `Inputs`, reference via named range |
 | Build a wide layout for time-series data | Pivot to long format with a `period` column |
+
+## Red flags — Format (lint and fix)
+
+| You're about to... | Fix |
+|---|---|
+| Apply colour differently to "Colour convention" above | Follow the canonical table. Don't improvise. Both blue font AND yellow fill on assumptions. |
+| Main header row not black-fill white-text | See "Colour convention → Structural signals". Grey `#D9D9D9` is for sub-headers only. |
+| Borders that stop mid-row on a totals or section line | Borders span every data column. See "Border consistency" in the post-write gate. |
+| Ship a workbook without role-coded tab colours | Call `set_tab_color` per the "Tab colour palette" table. |
+| Put a magic number in a formula | Extract to `Inputs` as a named range |
+| Merge cells inside a data zone | No. Borders + bold for visual grouping |
 | Ship a model without column widths or frozen panes | Mandatory in Pass 2. Call `set_column_width` + `set_frozen`. |
 | Mix units on one tab (raw £ and £m both present) | Pick one per tab. Mixed-unit tabs fail audit. |
-| Proceed past a `ROW_COUNT_MISMATCH` error | Retry with the `suggested_range` from the error — don't guess |
 
 ## Common rationalisations
 
