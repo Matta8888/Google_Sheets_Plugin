@@ -214,6 +214,62 @@ After the build, re-run the anti-pattern scan (same regex set from audit step 3)
 | `INDIRECT()`, `OFFSET()` | Break dependency analysis | Use direct refs; if dynamic, document with `set_cell_note` |
 | `IMPORTRANGE()` et al. | External HTTP per refresh; rate-limit hazard | Snapshot pattern — copy values on a schedule |
 
+## Batching discipline (MANDATORY)
+
+Each MCP tool call is one network round-trip and burns ~200–400 tokens of response + reasoning overhead. A 40-op turn without batching costs ~12k tokens in overhead alone. With batching, the same ops cost ~500. **Batch aggressively — it is never "cleaner" to call single-range tools N times.**
+
+**Rule:** if you have ≥2 ops of the same type in the same turn, use the batch tool. No exceptions.
+
+| Single-op tool | Batch replacement | Cap |
+|---|---|---|
+| `write_range` × N | `write_ranges_batch` | 50 ranges |
+| `format_range` × N | `format_ranges_batch` | 50 ranges |
+| `set_conditional_format` × N | `set_conditional_formats_batch` | 50 rules |
+| `read_range` × N | `read_ranges_batch` | 50 ranges |
+
+Sheet-qualified A1 works across all batch tools — `'Tab A'!A1:B2` and `'Tab B'!C1:D5` in the same call is fine.
+
+No batch form exists yet for `add_sheet`, `set_frozen`, `set_column_width`, `set_row_height`, `set_data_validation`, `set_tab_color`. These stay single-call — one per sheet is fine; don't loop per row/column.
+
+**Concrete pattern — populating a multi-tab model:**
+
+```
+# ❌ Wrong — 6 round-trips, 6 chances for a shape-mismatch retry
+write_range 'About'!A1:F30
+write_range '1_Stock_Mix'!A1:I22
+write_range '2_GYC_Engagement'!A1:I20
+write_range '3_Fuel_Conversion'!A1:G27
+write_range '4_Monthly_Trend'!A1:G26
+write_range '5_Top_Models'!A1:H25
+
+# ✅ Right — 1 round-trip, server validates all ranges in parallel
+write_ranges_batch data=[
+  {range: 'About'!A1:F30,             values: ...},
+  {range: '1_Stock_Mix'!A1:I22,       values: ...},
+  {range: '2_GYC_Engagement'!A1:I20,  values: ...},
+  {range: '3_Fuel_Conversion'!A1:G27, values: ...},
+  {range: '4_Monthly_Trend'!A1:G26,   values: ...},
+  {range: '5_Top_Models'!A1:H25,      values: ...},
+]
+```
+
+If any range has a shape mismatch, the batch tool returns a consolidated `ROW_COUNT_MISMATCH` error with a per-range `suggested_range` list — still one retry, not N.
+
+**For MIXED-type turns, use `execute_batch`.** When a single turn writes data AND formats AND freezes AND sets conditional formats (etc), the type-specific batches above still mean one round-trip per *type*. `execute_batch` collapses all of it into **one call** (at most 2 Sheets API calls internally — value endpoint + structural endpoint). Up to 100 ops of any mix across these 10 types:
+
+- `write_range`
+- `format_range`
+- `set_column_width`, `set_row_height`, `auto_resize_columns`
+- `set_frozen`
+- `set_conditional_format`
+- `merge_cells`
+- `add_sheet`
+- `set_cell_note`
+
+Pre-flight is consolidated: one `ROW_COUNT_MISMATCH` covering every write op with mismatches, one protected-range check across every range the batch touches. Partial-success path carries `values_committed` + `retry_guidance` so retries never double-write the values bucket.
+
+Rule: if your turn crosses two or more of those op types, compose one `execute_batch` rather than chaining separate tool calls. For homogeneous bulk (50 writes, no formats), `write_ranges_batch` is still simpler — use whichever is less verbose.
+
 ## Pre-write discipline (MANDATORY)
 
 Before any `write_range` / `write_ranges_batch` call:
@@ -321,9 +377,12 @@ Near these limits? Shard across spreadsheets and use **snapshot** `IMPORTRANGE`.
 | Hunt anti-patterns | `search_in_spreadsheet` with `use_regex: true` |
 | Trace cell dependencies | `analyse_formula_dependencies` |
 | Write with shape guard | `write_range` / `write_ranges_batch` (handles `ROW_COUNT_MISMATCH`, `safe_mode`, `return_computed`) |
+| Write 2+ ranges (ANY number of sheets) | `write_ranges_batch` — up to 50 in one call. **Default choice for multi-tab writes.** |
+| Read 2+ ranges | `read_ranges_batch` — up to 50 in one call |
 | Bulk formatting | `format_ranges_batch` (one call for many zones) |
 | Number format / colour / borders | `format_range` / `format_ranges_batch` |
-| Conditional format | `set_conditional_format` |
+| Conditional format (1 rule) | `set_conditional_format` |
+| Conditional format (2+ rules) | `set_conditional_formats_batch` — up to 50 rules |
 | Merge header cells | `merge_cells` |
 | Column widths | `set_column_width` / `auto_resize_columns` |
 | Row heights | `set_row_height` |
@@ -343,6 +402,8 @@ Near these limits? Shard across spreadsheets and use **snapshot** `IMPORTRANGE`.
 | You're about to... | Fix |
 |---|---|
 | Skip the `ping_sheets` check at session start | Stop. Call it. If it fails, the MCP isn't connected — tell the user and wait. |
+| Make two or more consecutive `write_range` / `format_range` / `read_range` / `set_conditional_format` calls in one turn | Stop. Collect the ranges into a single `*_batch` call. No exceptions. |
+| Turn spans write + format + structural ops as separate tool calls | Stop. Collapse into one `execute_batch` call. At most 2 API calls internally regardless of how many ops. |
 | Write to an existing sheet without first doing an audit report | Run the 4-step audit, report, wait for approval |
 | Call any write tool without first calling `enable_claude_log` | Stop. Call `enable_claude_log`. Non-negotiable. |
 | End the chat thread without calling `log_session_summary` | Non-negotiable. One summary row per thread — otherwise the audit trail is silent. |
@@ -371,6 +432,12 @@ Near these limits? Shard across spreadsheets and use **snapshot** `IMPORTRANGE`.
 
 | Excuse | Reality |
 |---|---|
+| "Writing one tab at a time is clearer / easier to follow" | Clarity isn't a round-trip cost — tokens are. One `write_ranges_batch` handles 6 tabs in one call; server-side shape-check runs across all ranges in parallel. |
+| "Different sheets, so they're different ops — can't batch" | Wrong. `write_ranges_batch`, `format_ranges_batch`, `read_ranges_batch`, `set_conditional_formats_batch` all accept sheet-qualified A1 across multiple tabs. |
+| "I need to see one write succeed before the next" | The batch tool validates every range server-side before writing any; you get a consolidated error or a consolidated success. No advantage to sequential. |
+| "I'll batch starting with the next one" | Batch from the first write. If you're still typing single-call writes after the second one, stop and rewrite as a batch. |
+| "`execute_batch` is overkill for just 4 ops" | 4 single-op calls = 4 round-trips ≈ 1.5k tokens. One `execute_batch` = 1 round-trip ≈ 500 tokens. Use it whenever the turn crosses op types. |
+| "I can't use `execute_batch` because my turn mixes writes AND structural" | That's exactly what `execute_batch` is for. It partitions internally into value-writes + structural, fires at most 2 Sheets API calls, and returns a unified response. |
 | "Formatting is polish, I'll do it last" | Formatting is Pass 2 of a 3-pass build. An unformatted model looks amateur and obscures bugs. Do it. |
 | "Number format auto-inferred, should be fine" | Auto-inference is format-leak risk. `0.918` displayed as `91.8%` is a classic. Always explicit. |
 | "Blank rows are fine as separators" | No. Borders. If you hit a blank-row separator during audit, treat as a structural finding. |
